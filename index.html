@@ -1,0 +1,164 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <script src="knockout-3.0.0.js"></script>
+    <script src="underscore.js" type="text/javascript"></script>
+    <style>
+      body {
+        margin: 0px;
+        padding: 0px;
+      }
+    </style>
+    <script>
+      $(function(){
+
+
+        var ViewModel = function() {
+          var that = this;
+          this.enigma = new Enigma();
+
+          this.inputText = ko.observable('');
+          this.outputText = ko.observable('');
+
+          $(this.enigma).on('newCharacter', function(event, data) {
+            that.inputText(that.inputText() + data.input);
+            that.outputText(that.outputText() + data.output);
+          })
+
+          this.inputKeyDown = function(data, event) {
+            event.preventDefault();
+            var keyCode = event.keyCode;
+            if(keyCode < 65 || keyCode > 90)
+              return;
+            data.enigma.keyDown(String.fromCharCode(event.keyCode));
+          }
+
+          this.inputKeyUp = function(data, event) {
+            event.preventDefault();
+            var keyCode = event.keyCode;
+            if(keyCode < 65 || keyCode > 90)
+              return;
+            data.enigma.keyUp(String.fromCharCode(event.keyCode));
+          }
+        }
+
+        var Enigma = function() {
+          var that = this;
+          this.currentPressedCharacter = ko.observable('');
+
+          this.wheel1 = new Wheel(EnigmaConstants.rotor1Wires);
+          this.mirror = new Mirror(EnigmaConstants.reflectorAWires);
+
+          this.wheel1.inputRightRef(this.currentPressedCharacter);
+          this.mirror.inputRef(this.wheel1.outputLeft);
+          this.wheel1.inputLeftRef(this.mirror.output);
+
+          this.currentOutputCharacter = ko.computed(function() {
+            return that.wheel1.outputRight();
+          })
+
+          this.keyDown = function(character) {
+            if(that.currentPressedCharacter() != '')
+              return;
+
+            that.currentPressedCharacter(character);
+
+            $(that).trigger('newCharacter', {input: that.currentPressedCharacter(), output: that.currentOutputCharacter()});
+          }
+
+          this.keyUp = function(character) {
+            if(that.currentPressedCharacter() != character)
+              return;
+
+            that.currentPressedCharacter('');
+          }
+        }
+
+        var Wheel = function(wires) {
+          var that = this;
+          this.inputLeftRef = ko.observable(function(){return ''});
+          this.inputRightRef = ko.observable(function(){return ''});
+
+          this.wiresLeft = EnigmaConstants.processWires(wires);
+          this.wiresRight = EnigmaConstants.inverseWires(this.wiresLeft);
+
+          this.outputLeft = ko.computed(function() {
+            return that.wiresLeft[that.inputRightRef()()];
+          })
+
+          this.outputRight = ko.computed(function() {
+            return that.wiresRight[that.inputLeftRef()()];
+          })
+        }
+
+        var Mirror = function(wires) {
+          var that = this;
+          this.inputRef = ko.observable(function(){return ''});
+          this.wires = EnigmaConstants.processWires(wires);
+
+          this.output = ko.computed(function() {
+            return that.wires[that.inputRef()()];
+          })
+        }
+        
+        EnigmaConstants = {
+          // https://en.wikipedia.org/wiki/Enigma_rotor_details
+          straightWires: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+          rotor1Wires: 'PEZUOHXSCVFMTBGLRINQJWAYDK',
+
+          reflectorAWires: 'EJMZALYXVBWFCRQUONTSPIKHGD',
+          
+          processWires: function(wires) {
+            var dictionary = [];
+            dictionary[''] = '';
+            for(var i = 0; i < 26; i++) {
+              var charCode = i + 65;
+              dictionary[String.fromCharCode(charCode)] = wires[i];
+            }
+            return dictionary;
+          },
+          inverseWires: function(wires) {
+            var dictionary = [];
+            dictionary[''] = '';
+            for(var i = 0; i < 26; i++) {
+              var charCode = i + 65;
+              var char = String.fromCharCode(charCode);
+              dictionary[wires[char]] = char;
+            }
+            return dictionary;
+          }
+        }
+
+        model = new ViewModel();
+        ko.applyBindings(model)
+      })
+    </script>
+  </head>
+  <body>
+    <div id="enigma">
+      <div>
+        <!--<span data-bind="text: wheel1.value" />
+        <span data-bind="text: wheel2.value" />
+        <span data-bind="text: wheel3.value" />-->
+      </div>
+      <div>
+        <h2>Input</h2>
+        <span data-bind="text: enigma.currentPressedCharacter"></span><br />
+        <textarea data-bind="value: inputText, event: { keydown: inputKeyDown, keyup: inputKeyUp }"></textarea>
+        
+        <h2>Ouput</h2>
+        <span data-bind="text: enigma.currentOutputCharacter"></span><br />
+        <textarea data-bind="value: outputText"></textarea>
+
+        <h2>Internals</h2>
+        wheel1 input right: <span data-bind="text: enigma.wheel1.inputRightRef()"></span><br />
+        wheel1 output left: <span data-bind="text: enigma.wheel1.outputLeft"></span><br />
+        mirror input: <span data-bind="text: enigma.mirror.inputRef()"></span><br />
+        mirror output: <span data-bind="text: enigma.mirror.output"></span><br />
+        wheel1 input left: <span data-bind="text: enigma.wheel1.inputLeftRef()"></span><br />
+        wheel1 output right: <span data-bind="text: enigma.wheel1.outputRight"></span><br />
+      </div>
+    </div>
+  </body>
+</html>
